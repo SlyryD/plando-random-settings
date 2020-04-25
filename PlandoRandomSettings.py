@@ -9,7 +9,7 @@ __version__ = "5-2-12R.2.0"
 # Parameters for generation
 ALLOW_LOGIC = False # True for random logic, false otherwise
 ALLOW_BRIDGETOKENS = True # Randomize Skulltula bridge condition
-ALLOW_MASTERQUEST = True # Randomize master quest dungeons using a geometric sequence of probabilities (expected value ~1)
+ALLOW_MASTERQUEST = True # Randomize master quest dungeons using a geometric distribution (expected value ~1)
 ALLOW_DERP = False # Randomize pointless things (textshuffle, unclear hints, etc)
 ALLOW_RECENT_BROKEN = False # Section to hold settings currently broken
 COOP_SETTINGS = False # Flag to generate a coop seed. This flag changes some of the flags above.
@@ -17,7 +17,7 @@ COOP_SETTINGS = False # Flag to generate a coop seed. This flag changes some of 
 # Randomize starting inventory
 # "off": No starting inventory
 # "legacy": Randomly start with Tycoon's Wallet and Fast Travel (Farore's, Prelude, Serenade)
-# "random": Randomize starting items, songs, and equipment using a geometric sequence of probabilities (expected value ~1)
+# "random": Randomize starting items, songs, and equipment using a geometric distribution (expected value ~1)
 STARTING_INVENTORY = "random"
 
 # Numbers of tricks and excluded locations to add
@@ -79,16 +79,22 @@ def start_with_tycoons_wallet():
     return start_with_tycoons_wallet.choice
 
 
-# Get a list of bools where the xth element is True with probability 1/2**(x + 1)
-def draw_from_geometric_sequence_of_probabilities(k):
-    return [random.random() < 1/2**(x + 1) for x in range(k)]
+# Draw from the geometric distribution (the number of successful coin flips before the first failure up to k)
+def draw_from_geometric_distribution(k):
+    result = 0
+    for _ in range(k):
+        if random.random() < 1/2:
+            return result
+        else:
+            result += 1
+    return result
 
 
-# Randomize starting pool using a geometric sequence of probabilities
+# Randomize starting pool
 def populate_starting_pool(pool):
     shuffled_pool = random.sample(list(pool), len(pool))
-    distribution = draw_from_geometric_sequence_of_probabilities(len(pool))
-    return [elt for (elt, include) in zip(shuffled_pool, distribution) if include]
+    num = draw_from_geometric_distribution(len(pool))
+    return shuffled_pool[:num]
 
 
 # Populate starting items
@@ -199,14 +205,14 @@ def main():
     # Choose the number of master quest dungeons
     if ALLOW_MASTERQUEST:
         random_settings["mq_dungeons_random"] = False
-        random_settings["mq_dungeons"] = sum(draw_from_geometric_sequence_of_probabilities(12))
+        random_settings["mq_dungeons"] = draw_from_geometric_distribution(12)
 
     # Choose the number of starting hearts
-    random_settings["starting_hearts"] = 3 + sum(draw_from_geometric_sequence_of_probabilities(17))
+    random_settings["starting_hearts"] = 3 + draw_from_geometric_distribution(17)
 
     # Choose the number of big poes
     random_settings["big_poe_count_random"] = False
-    random_settings["big_poe_count"] = 1 + sum(draw_from_geometric_sequence_of_probabilities(9))
+    random_settings["big_poe_count"] = 1 + draw_from_geometric_distribution(9)
 
     # If damage multiplier quad or ohko, restrict ice traps
     if random_settings["damage_multiplier"] in ["quadruple", "ohko"] and \
